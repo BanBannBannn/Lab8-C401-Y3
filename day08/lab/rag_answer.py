@@ -25,7 +25,6 @@ import os
 from typing import List, Dict, Any, Optional, Tuple
 from dotenv import load_dotenv
 import chromadb
-
 load_dotenv()
 
 # =============================================================================
@@ -77,10 +76,6 @@ def retrieve_dense(query: str, top_k: int = TOP_K_SEARCH) -> List[Dict[str, Any]
         # Lưu ý: distances trong ChromaDB cosine = 1 - similarity
         # Score = 1 - distance
     """
-    # raise NotImplementedError(
-    #     "TODO Sprint 2: Implement retrieve_dense().\n"
-    #     "Tham khảo comment trong hàm để biết cách query ChromaDB."
-
     from index import get_embedding, CHROMA_DB_DIR
 
     client = chromadb.PersistentClient(path=str(CHROMA_DB_DIR)) #Lưu trữ tệp cục bộ; dữ liệu được giữ nguyên sau khi khởi động lại.
@@ -107,7 +102,7 @@ def retrieve_dense(query: str, top_k: int = TOP_K_SEARCH) -> List[Dict[str, Any]
             "score": 1 - dist,  # cosine distance → similarity
         })
     return chunks
-
+    
 
 
 # =============================================================================
@@ -137,10 +132,44 @@ def retrieve_sparse(query: str, top_k: int = TOP_K_SEARCH) -> List[Dict[str, Any
         scores = bm25.get_scores(tokenized_query)
         top_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:top_k]
     """
-    # TODO Sprint 3: Implement BM25 search
-    # Tạm thời return empty list
-    print("[retrieve_sparse] Chưa implement — Sprint 3")
-    return []
+
+    import chromadb
+    from rank_bm25 import BM25Okapi
+    from index import CHROMA_DB_DIR
+    client = chromadb.PersistentClient(path=str(CHROMA_DB_DIR))
+    collection = client.get_collection("rag_lab")
+
+    results = collection.get(include=["documents", "metadatas"])
+
+    documents = results["documents"]
+    metadatas = results["metadatas"]
+
+    all_chunks = []
+    for doc, meta in zip(documents, metadatas):
+        all_chunks.append({
+            "text": doc,
+            "metadata": meta,
+        })
+
+    if not all_chunks:
+        return []
+
+    corpus = [chunk["text"] for chunk in all_chunks]
+    tokenized_corpus = [doc.lower().split() for doc in corpus]
+    bm25 = BM25Okapi(tokenized_corpus)
+    tokenized_query = query.lower().split()
+    scores = bm25.get_scores(tokenized_query)
+    top_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:top_k]
+
+    sparse_results = []
+    for i in top_indices:
+        sparse_results.append({
+            "text": all_chunks[i]["text"],
+            "metadata": all_chunks[i]["metadata"],
+            "score": float(scores[i]),
+        })
+
+    return sparse_results
 
 
 # =============================================================================
@@ -416,19 +445,10 @@ def call_llm(prompt: str) -> str:
 
     Lưu ý: Dùng temperature=0 hoặc thấp để output ổn định cho evaluation.
     """
-    # raise NotImplementedError(
-    #     "TODO Sprint 2: Implement call_llm().\n"
-    #     "Chọn Option A (OpenAI) hoặc Option B (Gemini) trong TODO comment."
-    # )
-    from openai import OpenAI
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    response = client.chat.completions.create(
-        model=LLM_MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0,  # temperature=0 để output ổn định, dễ đánh giá
-        max_tokens=512,
+    raise NotImplementedError(
+        "TODO Sprint 2: Implement call_llm().\n"
+        "Chọn Option A (OpenAI) hoặc Option B (Gemini) trong TODO comment."
     )
-    return response.choices[0].message.content
 
 
 def rag_answer(
